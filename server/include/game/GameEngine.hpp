@@ -11,7 +11,9 @@
 namespace poker {
     class GameEngine {
     public:
-        void startHand(const std::vector<std::shared_ptr<Player> > &players);
+        void startHand();
+
+        void setPlayers(const std::vector<std::shared_ptr<Player> > &p);
 
         void dealPrivate();
 

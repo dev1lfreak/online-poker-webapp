@@ -11,6 +11,8 @@ namespace poker {
         Active,
         Folded,
         AllIn,
+        Check,
+        Bet,
         Disconnected
     };
 

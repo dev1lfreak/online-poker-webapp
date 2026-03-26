@@ -2,9 +2,7 @@
 #include "../../include/players/Player.hpp"
 
 namespace poker {
-    void GameEngine::startHand(const std::vector<std::shared_ptr<Player> > &p) {
-        players = p;
-
+    void GameEngine::startHand() {
         deck = Deck();
         deck.shuffle();
         board.clear();
@@ -12,6 +10,10 @@ namespace poker {
         roundManager.setPlayers(players);
         state = GameState::Preflop;
         dealPrivate();
+    }
+
+    void GameEngine::setPlayers(const std::vector<std::shared_ptr<Player> > &p) {
+        players = p;
     }
 
     void GameEngine::dealPrivate() {

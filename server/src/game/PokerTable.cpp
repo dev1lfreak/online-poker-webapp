@@ -13,8 +13,13 @@ namespace poker {
 
     void PokerTable::addPlayer(std::shared_ptr<Player> player) {
         boost::asio::post(strand, [this,player] {
-            players.push_back(player);
-            if (players.size() >= 6) isFull = true;
+            if (!isFull) {
+                players.push_back(player);
+                player->setTableId(id);
+                if (players.size() >= 6) {
+                    isFull = true;
+                }
+            }
         });
     }
 
@@ -48,6 +53,30 @@ namespace poker {
                 << boost::json::serialize(obj)
                 << std::endl;
     }
+
+    // void PokerTable::broadcast(const Message& msg) {
+    //     // Предполагаем, что у стола есть ссылка на connectionManager_
+    //     for (const auto& player : players) {
+    //         // Рассылаем всем, кто сидит за столом и не отключился
+    //         if (player && player->getState() != PlayerState::Disconnected) {
+    //             connectionManager_.sendTo(player->getId(), msg);
+    //         }
+    //     }
+    // }
+    //
+    // // Пример использования: Игрок сделал ставку
+    // void PokerTable::handleBet(PlayerId id, int amount) {
+    //     // ... логика снятия фишек ...
+    //
+    //     // Уведомляем всех за столом
+    //     Message updateMsg;
+    //     updateMsg.type = MessageType::Bet;
+    //     updateMsg.playerId = id;
+    //     updateMsg.tableId = this->tableId;
+    //     updateMsg.amount = amount;
+    //
+    //     broadcast(updateMsg);
+    // }
 
     void PokerTable::startTurnTimerFor(const std::shared_ptr<Player> &player) {
         currentTurnPlayerId = player->getId();
@@ -125,7 +154,7 @@ namespace poker {
 
     void PokerTable::startHand() {
         rotateDealer();
-        engine.startHand(players);
+        engine.startHand();
 
         startBettingRound();
     }
@@ -222,6 +251,7 @@ namespace poker {
     void PokerTable::startGame() {
         boost::asio::post(strand, [this] {
             if (players.size() > 1) {
+                engine.setPlayers(players);
                 startHand();
             }
         });

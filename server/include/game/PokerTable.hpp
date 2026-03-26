@@ -38,6 +38,8 @@ namespace poker {
 
         void handleTimeout(const std::shared_ptr<Player> &player);
 
+        void startTurnTimerFor(const std::shared_ptr<Player> &player);
+
     private:
         int id;
         std::vector<std::shared_ptr<Player> > players;
@@ -56,7 +58,5 @@ namespace poker {
         PlayerId currentTurnPlayerId{0};
 
         void broadcastState() ;
-
-        void startTurnTimerFor(const std::shared_ptr<Player> &player);
     };
 }

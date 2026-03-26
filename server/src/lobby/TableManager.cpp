@@ -22,13 +22,13 @@ namespace poker {
         return nullptr;
     }
 
-    std::shared_ptr<PokerTable> TableManager::findFreeTable() { // Подумать, что можно сделать с mutex
+    std::shared_ptr<PokerTable> TableManager::findFreeTable() {
         std::lock_guard lock(mutex);
 
         for (auto &t: tables) {
             if (!t->getFull())
                 return t;
         }
-        return createTable();
+        return nullptr;
     }
 }
