@@ -8,6 +8,10 @@ namespace poker {
                                ? std::string(obj["type"].as_string().c_str())
                                : std::string{};
 
+        std::string payload = obj.if_contains("payload")
+                       ? std::string(obj["payload"].as_string().c_str())
+                       : std::string{};
+
         if (type == "login")
             msg.type = MessageType::Login;
         else if (type == "join")
@@ -33,7 +37,7 @@ namespace poker {
             msg.amount = static_cast<int>(a->as_int64());
         }
 
-        msg.payload = boost::json::serialize(obj);
+        msg.payload = payload;
         return msg;
     }
 
@@ -66,9 +70,7 @@ namespace poker {
             obj["amount"] = msg.amount;
         }
 
-        if (!msg.payload.empty()) {
-            obj["payload"] = msg.payload;
-        }
+        obj["payload"] = msg.payload;
 
         return boost::json::serialize(obj);
     }

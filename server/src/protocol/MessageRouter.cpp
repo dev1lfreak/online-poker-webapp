@@ -21,7 +21,7 @@ namespace poker {
                 if (!player) break;
 
                 auto table = tm.findFreeTable();
-                if (!table) break;
+                if (!table) table = tm.createTable();
 
                 player->setTableId(table->getId());
                 table->addPlayer(player);

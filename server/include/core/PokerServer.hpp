@@ -1,40 +1,49 @@
 #pragma once
 
+#include <boost/asio.hpp>
+#include <memory>
+#include <thread>
+#include <vector>
+#include <cstdint>
+
 #include "../players/PlayerManager.hpp"
 #include "../lobby/TableManager.hpp"
 #include "../chat/ChatManager.hpp"
 #include "../network/ConnectionManager.hpp"
-#include "../protocol/Message.hpp"
 #include "../protocol/MessageRouter.hpp"
-#include <boost/asio.hpp>
 
 namespace poker {
     class PokerServer {
     public:
-        PokerServer();
+        explicit PokerServer(uint16_t port = 8080);
+        ~PokerServer();
 
         void start();
 
-        PlayerManager &getPlayerManager();
+        void stop();
 
-        TableManager &getTableManager();
-
-        ChatManager &getChatManager();
-
-        ConnectionManager &getConnectionManager();
-
-        boost::asio::io_context &getIoContext();
-
-        void handleRawMessage(const std::string &data);
+        PlayerManager& getPlayerManager() { return playerManager_; }
+        TableManager& getTableManager() { return tableManager_; }
+        ChatManager& getChatManager() { return chatManager_; }
+        ConnectionManager& getConnectionManager() { return connectionManager_; }
+        MessageRouter& getRouter() { return router_; }
+        boost::asio::io_context& getIoContext() { return io_; }
 
     private:
-        boost::asio::io_context io;
-        boost::asio::thread_pool pool;
+        void doAccept();
 
-        PlayerManager playerManager;
-        TableManager tableManager;
-        ChatManager chatManager;
-        ConnectionManager connectionManager;
-        MessageRouter router;
+        void setupSignalHandling();
+
+        boost::asio::io_context io_;
+        boost::asio::signal_set signals_;
+        boost::asio::ip::tcp::acceptor acceptor_;
+
+        PlayerManager playerManager_;
+        TableManager tableManager_;
+        ChatManager chatManager_;
+        ConnectionManager connectionManager_;
+        MessageRouter router_;
+
+        std::vector<std::thread> threadPool_;
     };
 }
