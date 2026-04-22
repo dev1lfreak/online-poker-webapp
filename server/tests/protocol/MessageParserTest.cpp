@@ -18,7 +18,7 @@ TEST(MessageParserTest, ParsesValidBetJson) {
 
 TEST(MessageParserTest, SerializesMessageToJson) {
     Message msg;
-    msg.type = MessageType::JoinTable; // Индекс 1
+    msg.type = MessageType::JoinTable;
     msg.playerId = 99;
     msg.tableId = 5;
     msg.amount = 0;

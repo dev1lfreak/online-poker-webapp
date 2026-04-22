@@ -50,30 +50,3 @@ TEST_F(RoundManagerTest, ExactBalanceBetTriggersAllIn) {
     EXPECT_EQ(p3->getChips(), 0);
     EXPECT_EQ(p3->getState(), PlayerState::AllIn);
 }
-
-// // Проверка завершения круга торговли (все уравняли)
-// TEST_F(RoundManagerTest, BettingIsCompleteWhenAllMatchCall) {
-//     roundManager->bet(p1->getId(), 100); // Алиса ставит 100
-//     EXPECT_FALSE(roundManager->isBettingComplete());
-//
-//     roundManager->bet(p2->getId(), 100); // Боб коллирует
-//     EXPECT_FALSE(roundManager->isBettingComplete());
-//
-//     roundManager->bet(p3->getId(), 100); // Чарли коллирует
-//     // Теперь все внесли равную долю в банк
-//     EXPECT_TRUE(roundManager->isBettingComplete());
-//     EXPECT_EQ(roundManager->getPot(), 300);
-// }
-//
-// // Проверка, что фолд исключает игрока из требований к окончанию торгов
-// TEST_F(RoundManagerTest, FoldedPlayersAreIgnoredInBettingComplete) {
-//     roundManager->bet(p1->getId(), 200);
-//
-//     roundManager->fold(p2->getId()); // Боб сбрасывает
-//     EXPECT_EQ(p2->getState(), PlayerState::Folded);
-//
-//     roundManager->bet(p3->getId(), 200); // Чарли коллирует
-//
-//     // Торговля должна завершиться, так как Боб сбросил, а Алиса и Чарли уравнялись
-//     EXPECT_TRUE(roundManager->isBettingComplete());
-// }

@@ -9,7 +9,7 @@
 #include "../protocol/MessageRouter.hpp"
 
 namespace poker {
-    class PokerServer; // Для доступа к менеджерам
+    class PokerServer;
     class ConnectionManager;
 
     class Connection : public std::enable_shared_from_this<Connection> {
@@ -17,7 +17,8 @@ namespace poker {
         Connection(boost::asio::ip::tcp::socket socket, PokerServer& server, ConnectionManager& manager);
 
         void start();
-        void send(const Message& msg);
+
+        virtual void send(const Message& msg);
 
         PlayerId getPlayerId() const { return playerId_; }
         void setPlayerId(PlayerId id) { playerId_ = id; }
