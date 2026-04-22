@@ -3,6 +3,7 @@
 #include "../ClientController.hpp"
 
 #include <QJsonArray>
+#include <QLabel>
 #include <QListWidget>
 #include <QPushButton>
 #include <QVBoxLayout>
@@ -25,10 +26,16 @@ void WaitingRoomWindow::setupUi() {
     auto *layout = new QVBoxLayout(central);
 
     playersList_ = new QListWidget();
-    startButton_ = new QPushButton("Начать игру");
-    leaveButton_ = new QPushButton("Выйти из-за стола");
+    lastResultTitleLabel_ = new QLabel("Last Hand Result:");
+    lastResultLabel_ = new QLabel("No games played at this table yet");
+    lastResultLabel_->setWordWrap(true);
+    startButton_ = new QPushButton("Start Game");
+    leaveButton_ = new QPushButton("Leave Table");
+    leaveButton_->setProperty("role", "danger");
 
     layout->addWidget(playersList_);
+    layout->addWidget(lastResultTitleLabel_);
+    layout->addWidget(lastResultLabel_);
     layout->addWidget(startButton_);
     layout->addWidget(leaveButton_);
 
@@ -48,6 +55,21 @@ void WaitingRoomWindow::applyState(const QJsonObject &state) {
                                   .arg(botMark)
                                   .arg(p.value("chips").toInt()));
     }
+
+    if (state.value("hasLastHandResult").toBool(false)) {
+        const QString winner = state.value("lastWinnerNickname").toString("unknown");
+        const QString combo = state.value("lastWinnerCombination").toString("n/a");
+        const int winAmount = state.value("lastWinAmount").toInt(0);
+        lastResultLabel_->setText(QString("Winner: %1\nCombination: %2\nWin Amount: %3")
+                                      .arg(winner)
+                                      .arg(combo)
+                                      .arg(winAmount));
+        lastResultTitleLabel_->setVisible(true);
+    } else {
+        lastResultLabel_->setText("No games played at this table yet");
+        lastResultTitleLabel_->setVisible(false);
+    }
+
     startButton_->setEnabled(state.value("canStartGame").toBool(false));
 }
 }

@@ -18,9 +18,6 @@ ConnectionWindow::ConnectionWindow(ClientController *controller, QWidget *parent
 
     connect(connectButton_, &QPushButton::clicked, this, &ConnectionWindow::onConnectClicked);
     connect(exitButton_, &QPushButton::clicked, this, &ConnectionWindow::onExitClicked);
-    connect(controller_, &ClientController::statusChanged, this, [this](const QString &status) {
-        statusLabel_->setText(status);
-    });
     connect(controller_, &ClientController::loginCompleted, this, &ConnectionWindow::onLoginCompleted);
 }
 
@@ -34,9 +31,9 @@ void ConnectionWindow::setupUi() {
     nicknameEdit_->setPlaceholderText("Nickname");
     portEdit_->setValidator(new QIntValidator(1, 65535, portEdit_));
 
-    connectButton_ = new QPushButton("Подключиться");
-    exitButton_ = new QPushButton("Выход");
-    statusLabel_ = new QLabel("Disconnected");
+    connectButton_ = new QPushButton("Enter");
+    exitButton_ = new QPushButton("Exit");
+    exitButton_->setProperty("role", "danger");
 
     layout->addWidget(new QLabel("IP:"));
     layout->addWidget(hostEdit_);
@@ -46,7 +43,6 @@ void ConnectionWindow::setupUi() {
     layout->addWidget(nicknameEdit_);
     layout->addWidget(connectButton_);
     layout->addWidget(exitButton_);
-    layout->addWidget(statusLabel_);
 
     setCentralWidget(central);
     setWindowTitle("Online Poker - Connect");
@@ -56,7 +52,7 @@ void ConnectionWindow::setupUi() {
 void ConnectionWindow::onConnectClicked() {
     const QString nick = nicknameEdit_->text().trimmed();
     if (nick.isEmpty()) {
-        QMessageBox::warning(this, "Nickname", "Введите ник");
+        QMessageBox::warning(this, "Nickname", "Enter your nickname");
         return;
     }
     const QString host = hostEdit_->text().trimmed();

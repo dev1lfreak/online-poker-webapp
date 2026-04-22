@@ -7,6 +7,7 @@
 #include <boost/asio.hpp>
 #include <vector>
 #include <memory>
+#include <string>
 
 namespace poker {
     class PokerTable {
@@ -57,9 +58,16 @@ namespace poker {
         size_t bigBlindIndex{2};
         bool isFull{false};
 
-        int smallBlind{10};
-        int bigBlind{20};
+        int smallBlind{20};
+        int bigBlind{40};
         bool gameInProgress{false};
+
+        bool hasLastHandResult_{false};
+        std::string lastWinnerNickname_;
+        std::string lastWinnerCombination_;
+        std::string lastWinnerHoleCards_;
+        std::string lastBoardCards_;
+        int lastWinAmount_{0};
 
         PlayerId currentTurnPlayerId{0};
         ConnectionManager &connectionManager;
@@ -67,6 +75,11 @@ namespace poker {
         void broadcastState() ;
         void broadcastAction(const std::string &action, PlayerId playerId, int amount = 0, const std::string &payload = "");
         void broadcast(const Message &msg);
+        std::shared_ptr<Player> playerAtIndex(size_t index) const;
+        bool isSmallBlindPlayer(PlayerId id) const;
+        bool isBigBlindPlayer(PlayerId id) const;
+        bool isBlindPostingTurn(PlayerId id) const;
+        int blindAmountFor(PlayerId id) const;
         bool isBotPlayer(const std::shared_ptr<Player> &player) const;
         void processBotTurn(const std::shared_ptr<Player> &player);
         std::string serializeCard(const Card &card) const;

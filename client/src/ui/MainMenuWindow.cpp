@@ -25,9 +25,10 @@ void MainMenuWindow::setupUi() {
     auto *central = new QWidget(this);
     auto *layout = new QVBoxLayout(central);
 
-    playButton_ = new QPushButton("Играть");
-    playBotsButton_ = new QPushButton("Играть с ботами");
-    exitButton_ = new QPushButton("Выйти");
+    playButton_ = new QPushButton("Play");
+    playBotsButton_ = new QPushButton("Play with bots");
+    exitButton_ = new QPushButton("Exit");
+    exitButton_->setProperty("role", "danger");
 
     layout->addWidget(playButton_);
     layout->addWidget(playBotsButton_);

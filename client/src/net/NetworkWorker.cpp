@@ -102,7 +102,7 @@ void NetworkWorker::handleIncoming(const QJsonObject &message) {
         return;
     }
 
-    if (message.contains("tableId")) {
+    if ((type == "join" || type == "play_with_bots") && message.contains("tableId")) {
         const int tableId = message.value("tableId").toInt(-1);
         if (tableId >= 0) emit joinedTable(tableId);
     }

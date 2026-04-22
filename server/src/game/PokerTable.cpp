@@ -1,4 +1,5 @@
 #include "../../include/game/PokerTable.hpp"
+#include "../../include/game/HandEvaluator.hpp"
 #include <algorithm>
 #include <iostream>
 #include <boost/json.hpp>
@@ -37,6 +38,30 @@ namespace poker {
             }
             return "?";
         }
+
+        std::string handRankToText(int rank) {
+            switch (rank) {
+                case 9: return "Royal Flush";
+                case 8: return "Straight Flush";
+                case 7: return "Four of a Kind";
+                case 6: return "Full House";
+                case 5: return "Flush";
+                case 4: return "Straight";
+                case 3: return "Three of a Kind";
+                case 2: return "Two Pair";
+                case 1: return "One Pair";
+                default: return "High Card";
+            }
+        }
+
+        std::string joinCards(const std::vector<poker::Card> &cards) {
+            std::string out;
+            for (size_t i = 0; i < cards.size(); ++i) {
+                if (!out.empty()) out += " ";
+                out += "[" + rankToString(cards[i].rank) + suitToString(cards[i].suit) + "]";
+            }
+            return out;
+        }
     }
 
     PokerTable::PokerTable(int id, boost::asio::io_context &io, ConnectionManager &connectionManager)
@@ -67,6 +92,32 @@ namespace poker {
         return players;
     }
 
+    std::shared_ptr<Player> PokerTable::playerAtIndex(size_t index) const {
+        if (players.empty()) return nullptr;
+        return players[index % players.size()];
+    }
+
+    bool PokerTable::isSmallBlindPlayer(PlayerId id) const {
+        const auto player = playerAtIndex(smallBlindIndex);
+        return player && player->getId() == id;
+    }
+
+    bool PokerTable::isBigBlindPlayer(PlayerId id) const {
+        const auto player = playerAtIndex(bigBlindIndex);
+        return player && player->getId() == id;
+    }
+
+    bool PokerTable::isBlindPostingTurn(PlayerId id) const {
+        return engine.getState() == GameState::Preflop &&
+               (isSmallBlindPlayer(id) || isBigBlindPlayer(id));
+    }
+
+    int PokerTable::blindAmountFor(PlayerId id) const {
+        if (isSmallBlindPlayer(id)) return smallBlind;
+        if (isBigBlindPlayer(id)) return bigBlind;
+        return 0;
+    }
+
     void PokerTable::broadcastState() {
         boost::json::object obj;
         obj["event"] = "state_snapshot";
@@ -78,6 +129,22 @@ namespace poker {
         obj["gameState"] = static_cast<int>(engine.getState());
         obj["gameInProgress"] = gameInProgress;
         obj["canStartGame"] = players.size() > 1 && !gameInProgress;
+        obj["smallBlindAmount"] = smallBlind;
+        obj["bigBlindAmount"] = bigBlind;
+        if (!players.empty()) {
+            const auto smallBlindPlayer = playerAtIndex(smallBlindIndex);
+            const auto bigBlindPlayer = playerAtIndex(bigBlindIndex);
+            obj["smallBlindPlayerId"] = smallBlindPlayer ? static_cast<std::int64_t>(smallBlindPlayer->getId()) : 0;
+            obj["bigBlindPlayerId"] = bigBlindPlayer ? static_cast<std::int64_t>(bigBlindPlayer->getId()) : 0;
+        }
+        obj["hasLastHandResult"] = hasLastHandResult_;
+        if (hasLastHandResult_) {
+            obj["lastWinnerNickname"] = lastWinnerNickname_;
+            obj["lastWinnerCombination"] = lastWinnerCombination_;
+            obj["lastWinnerHoleCards"] = lastWinnerHoleCards_;
+            obj["lastBoardCards"] = lastBoardCards_;
+            obj["lastWinAmount"] = lastWinAmount_;
+        }
 
         boost::json::array playersArr;
         for (const auto &p: players) {
@@ -111,6 +178,9 @@ namespace poker {
                 myCardsArr.push_back(boost::json::value(serializeCard(card)));
             }
             personalized["myCards"] = myCardsArr;
+            const int myRoundBet = rm.getRoundBet(player->getId());
+            personalized["myRoundBet"] = myRoundBet;
+            personalized["callAmount"] = std::max(0, rm.getCurrentBet() - myRoundBet);
 
             Message personalizedState;
             personalizedState.type = MessageType::State;
@@ -173,9 +243,23 @@ namespace poker {
     void PokerTable::handleTimeout(const std::shared_ptr<Player> &player) {
         std::cout << "Player " << player->getId() << " timed out." << std::endl;
         auto &rm = engine.getRoundManager();
-        rm.fold(player->getId());
-        broadcastAction("timeout_fold", player->getId());
-        std::cout << "Auto-folded player " << player->getId() << std::endl;
+        if (isBlindPostingTurn(player->getId())) {
+            const int expectedAmount = blindAmountFor(player->getId());
+            const int amount = std::min(expectedAmount, player->getChips());
+            if (amount > 0 && rm.bet(player->getId(), amount)) {
+                const std::string actionName = isSmallBlindPlayer(player->getId()) ? "small_blind" : "big_blind";
+                broadcastAction(actionName, player->getId(), amount);
+                std::cout << "Auto-posted blind for player " << player->getId() << std::endl;
+            } else {
+                rm.fold(player->getId());
+                broadcastAction("timeout_fold", player->getId());
+                std::cout << "Auto-folded player " << player->getId() << std::endl;
+            }
+        } else {
+            rm.fold(player->getId());
+            broadcastAction("timeout_fold", player->getId());
+            std::cout << "Auto-folded player " << player->getId() << std::endl;
+        }
 
         advanceGameFlow();
     }
@@ -185,49 +269,80 @@ namespace poker {
             if (!player) return;
 
             auto &rm = engine.getRoundManager();
+            const bool blindPostingTurn = isBlindPostingTurn(player->getId());
 
-            switch (msg.type) {
-                case MessageType::Bet: {
-                    int amount = msg.amount;
-                    if (!rm.bet(player->getId(), amount)) {
-                        std::cout << "Invalid bet from player " << player->getId() << std::endl;
-                        return;
-                    }
-                    std::cout << "Player " << player->getId()
-                            << " bets " << amount
-                            << " at table " << id << std::endl;
-                    broadcastAction("bet", player->getId(), amount);
-                    break;
-                }
-                case MessageType::Call: {
-                    if (!rm.call(player->getId())) return;
-                    int amount = rm.getCurrentBet();
-                    std::cout << "Player " << player->getId()
-                            << " calls " << amount
-                            << " at table " << id << std::endl;
-                    broadcastAction("call", player->getId(), amount);
-                    break;
-                }
-                case MessageType::Check: {
-                    if (!rm.check(player->getId())) return;
-                    std::cout << "Player " << player->getId()
-                            << " checks at table " << id << std::endl;
-                    broadcastAction("check", player->getId());
-                    break;
-                }
-                case MessageType::Fold: {
-                    rm.fold(player->getId());
-                    std::cout << "Player " << player->getId()
-                            << " folds at table " << id << std::endl;
-                    broadcastAction("fold", player->getId());
-                    break;
-                }
-                case MessageType::LeaveTable: {
+            if (blindPostingTurn) {
+                if (msg.type == MessageType::LeaveTable) {
                     disconnectPlayer(player->getId());
-                    break;
-                }
-                default:
                     return;
+                }
+
+                if (msg.type != MessageType::Bet) {
+                    return;
+                }
+
+                const int expectedAmount = blindAmountFor(player->getId());
+                const int amount = std::min(expectedAmount, player->getChips());
+                if (amount <= 0 || (msg.amount != expectedAmount && msg.amount != amount)) {
+                    std::cout << "Invalid blind bet from player " << player->getId() << std::endl;
+                    return;
+                }
+
+                if (!rm.bet(player->getId(), amount)) {
+                    std::cout << "Failed blind bet from player " << player->getId() << std::endl;
+                    return;
+                }
+
+                const std::string actionName = isSmallBlindPlayer(player->getId()) ? "small_blind" : "big_blind";
+                std::cout << "Player " << player->getId()
+                        << " posts " << actionName
+                        << " " << amount
+                        << " at table " << id << std::endl;
+                broadcastAction(actionName, player->getId(), amount);
+            } else {
+                switch (msg.type) {
+                    case MessageType::Bet: {
+                        int amount = msg.amount;
+                        if (!rm.bet(player->getId(), amount)) {
+                            std::cout << "Invalid bet from player " << player->getId() << std::endl;
+                            return;
+                        }
+                        std::cout << "Player " << player->getId()
+                                << " bets " << amount
+                                << " at table " << id << std::endl;
+                        broadcastAction("bet", player->getId(), amount);
+                        break;
+                    }
+                    case MessageType::Call: {
+                        if (!rm.call(player->getId())) return;
+                        int amount = rm.getCurrentBet();
+                        std::cout << "Player " << player->getId()
+                                << " calls " << amount
+                                << " at table " << id << std::endl;
+                        broadcastAction("call", player->getId(), amount);
+                        break;
+                    }
+                    case MessageType::Check: {
+                        if (!rm.check(player->getId())) return;
+                        std::cout << "Player " << player->getId()
+                                << " checks at table " << id << std::endl;
+                        broadcastAction("check", player->getId());
+                        break;
+                    }
+                    case MessageType::Fold: {
+                        rm.fold(player->getId());
+                        std::cout << "Player " << player->getId()
+                                << " folds at table " << id << std::endl;
+                        broadcastAction("fold", player->getId());
+                        break;
+                    }
+                    case MessageType::LeaveTable: {
+                        disconnectPlayer(player->getId());
+                        break;
+                    }
+                    default:
+                        return;
+                }
             }
 
             if (rm.isBettingComplete()) {
@@ -320,6 +435,25 @@ namespace poker {
         }
 
         int pot = rm.getPot();
+        if (winner) {
+            auto winnerCards = winner->getHand();
+            winnerCards.insert(winnerCards.end(), engine.getBoard().begin(), engine.getBoard().end());
+            const auto score = HandEvaluator::evaluate(winnerCards);
+            hasLastHandResult_ = true;
+            lastWinnerNickname_ = winner->getNickname();
+            lastWinnerCombination_ = handRankToText(score.rank);
+            lastWinnerHoleCards_ = joinCards(winner->getHand());
+            lastBoardCards_ = joinCards(engine.getBoard());
+            lastWinAmount_ = pot;
+        } else {
+            hasLastHandResult_ = false;
+            lastWinnerNickname_.clear();
+            lastWinnerCombination_.clear();
+            lastWinnerHoleCards_.clear();
+            lastBoardCards_.clear();
+            lastWinAmount_ = 0;
+        }
+
         if (winner && pot > 0) {
             winner->setChips(winner->getChips() + pot);
             std::cout << "Winner at table " << id
@@ -429,8 +563,18 @@ namespace poker {
             if (!player) return;
 
             auto &rm = engine.getRoundManager();
+            const bool blindPostingTurn = isBlindPostingTurn(player->getId());
             bool actionDone = false;
-            if (rm.getCurrentBet() > 0) {
+            if (blindPostingTurn) {
+                const int amount = std::min(blindAmountFor(player->getId()), player->getChips());
+                if (amount > 0) {
+                    actionDone = rm.bet(player->getId(), amount);
+                    if (actionDone) {
+                        const std::string actionName = isSmallBlindPlayer(player->getId()) ? "small_blind" : "big_blind";
+                        broadcastAction(actionName, player->getId(), amount);
+                    }
+                }
+            } else if (rm.getCurrentBet() > 0) {
                 actionDone = rm.call(player->getId());
                 if (actionDone) {
                     broadcastAction("call", player->getId(), rm.getCurrentBet());

@@ -155,6 +155,12 @@ namespace poker {
         return currentBet;
     }
 
+    int RoundManager::getRoundBet(PlayerId id) const {
+        const auto it = roundBets.find(id);
+        if (it == roundBets.end()) return 0;
+        return it->second;
+    }
+
     void RoundManager::resetPot() {
         pot = 0;
     }

@@ -30,6 +30,7 @@ namespace poker {
         int getPot() const;
 
         int getCurrentBet() const;
+        int getRoundBet(PlayerId id) const;
 
         void resetPot();
 

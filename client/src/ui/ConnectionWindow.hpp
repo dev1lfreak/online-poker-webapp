@@ -29,7 +29,6 @@ private:
     QLineEdit *hostEdit_{nullptr};
     QLineEdit *portEdit_{nullptr};
     QLineEdit *nicknameEdit_{nullptr};
-    QLabel *statusLabel_{nullptr};
     QPushButton *connectButton_{nullptr};
     QPushButton *exitButton_{nullptr};
 };

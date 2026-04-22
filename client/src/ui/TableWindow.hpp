@@ -3,6 +3,7 @@
 #include <QMainWindow>
 #include <QJsonArray>
 #include <QJsonObject>
+#include <QHash>
 
 class QLabel;
 class QListWidget;
@@ -30,14 +31,15 @@ private slots:
 private:
     void setupUi();
     void setCardLabels(const QJsonArray &board, const QJsonArray &holeCards);
+    void updateActionControls();
 
     ClientController *controller_;
 
     QLabel *potLabel_{nullptr};
+    QLabel *gameStatusLabel_{nullptr};
     QLabel *timerLabel_{nullptr};
     QLabel *myCardsLabel_{nullptr};
     QLabel *boardCardsLabel_{nullptr};
-    QLabel *handsLabel_{nullptr};
     QListWidget *playersList_{nullptr};
     QTextEdit *actionLog_{nullptr};
 
@@ -50,6 +52,15 @@ private:
 
     QTimer *localTimer_{nullptr};
     int remainingSeconds_{30};
+    int currentGameState_{0};
+    int currentBet_{0};
+    int myRoundBet_{0};
+    int callAmount_{0};
     quint64 currentTurnPlayerId_{0};
+    quint64 smallBlindPlayerId_{0};
+    quint64 bigBlindPlayerId_{0};
+    int smallBlindAmount_{20};
+    int bigBlindAmount_{40};
+    QHash<quint64, QString> playerNamesById_;
 };
 }

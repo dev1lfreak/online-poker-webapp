@@ -4,6 +4,7 @@
 #include <QJsonObject>
 
 class QListWidget;
+class QLabel;
 class QPushButton;
 
 namespace client {
@@ -25,6 +26,8 @@ private:
 
     ClientController *controller_;
     QListWidget *playersList_{nullptr};
+    QLabel *lastResultTitleLabel_{nullptr};
+    QLabel *lastResultLabel_{nullptr};
     QPushButton *startButton_{nullptr};
     QPushButton *leaveButton_{nullptr};
 };

@@ -28,10 +28,10 @@ void TableWindow::setupUi() {
     auto *mainLayout = new QVBoxLayout(central);
 
     potLabel_ = new QLabel("Pot: 0");
+    gameStatusLabel_ = new QLabel("Stage: Waiting for players");
     timerLabel_ = new QLabel("Timer: 30");
     myCardsLabel_ = new QLabel("My cards: [??] [??]");
     boardCardsLabel_ = new QLabel("Board: [??] [??] [??] [??] [??]");
-    handsLabel_ = new QLabel("Hands: n/a");
 
     playersList_ = new QListWidget();
     actionLog_ = new QTextEdit();
@@ -41,9 +41,10 @@ void TableWindow::setupUi() {
     callBtn_ = new QPushButton("Call");
     foldBtn_ = new QPushButton("Fold");
     raiseBtn_ = new QPushButton("Raise");
-    leaveBtn_ = new QPushButton("Выйти из-за стола");
+    leaveBtn_ = new QPushButton("Leave table");
+    leaveBtn_->setProperty("role", "danger");
     raiseSpin_ = new QSpinBox();
-    raiseSpin_->setMinimum(1);
+    raiseSpin_->setMinimum(20);
     raiseSpin_->setMaximum(100000);
     raiseSpin_->setValue(20);
 
@@ -56,10 +57,10 @@ void TableWindow::setupUi() {
     actionsLayout->addWidget(leaveBtn_);
 
     mainLayout->addWidget(potLabel_);
+    mainLayout->addWidget(gameStatusLabel_);
     mainLayout->addWidget(timerLabel_);
     mainLayout->addWidget(myCardsLabel_);
     mainLayout->addWidget(boardCardsLabel_);
-    mainLayout->addWidget(handsLabel_);
     mainLayout->addWidget(new QLabel("Players:"));
     mainLayout->addWidget(playersList_);
     mainLayout->addLayout(actionsLayout);
@@ -68,7 +69,7 @@ void TableWindow::setupUi() {
 
     setCentralWidget(central);
     setWindowTitle("Online Poker - Table");
-    resize(850, 600);
+    resize(850, 670);
 
     connect(checkBtn_, &QPushButton::clicked, controller_, &ClientController::sendCheck);
     connect(callBtn_, &QPushButton::clicked, controller_, &ClientController::sendCall);
@@ -80,6 +81,8 @@ void TableWindow::setupUi() {
         controller_->leaveTable();
         emit leaveRequested();
     });
+
+    updateActionControls();
 
     localTimer_ = new QTimer(this);
     connect(localTimer_, &QTimer::timeout, this, &TableWindow::tickLocalTimer);
@@ -106,28 +109,60 @@ void TableWindow::setCardLabels(const QJsonArray &board, const QJsonArray &holeC
 
 void TableWindow::applyState(const QJsonObject &state) {
     potLabel_->setText(QString("Pot: %1").arg(state.value("pot").toInt(0)));
+    currentBet_ = state.value("currentBet").toInt(0);
+    myRoundBet_ = state.value("myRoundBet").toInt(0);
+    callAmount_ = state.value("callAmount").toInt(0);
+    currentGameState_ = state.value("gameState").toInt(0);
+    smallBlindPlayerId_ = static_cast<quint64>(state.value("smallBlindPlayerId").toInteger(0));
+    bigBlindPlayerId_ = static_cast<quint64>(state.value("bigBlindPlayerId").toInteger(0));
+    smallBlindAmount_ = state.value("smallBlindAmount").toInt(20);
+    bigBlindAmount_ = state.value("bigBlindAmount").toInt(40);
+
+    const int gameState = currentGameState_;
+    QString gameStageText;
+    switch (gameState) {
+        case 1:
+            gameStageText = "Pre-flop";
+            break;
+        case 2:
+            gameStageText = "Flop";
+            break;
+        case 3:
+            gameStageText = "Turn";
+            break;
+        case 4:
+            gameStageText = "River";
+            break;
+        case 5:
+            gameStageText = "Showdown";
+            break;
+        default:
+            gameStageText = "Waiting for players";
+            break;
+    }
+    gameStatusLabel_->setText(QString("Stage: %1").arg(gameStageText));
     currentTurnPlayerId_ = static_cast<quint64>(state.value("currentTurnPlayerId").toInteger(0));
     remainingSeconds_ = 30;
+    updateActionControls();
 
     const QJsonArray board = state.value("board").toArray();
     const QJsonArray holeCards = state.value("myCards").toArray();
     setCardLabels(board, holeCards);
 
-    if (state.contains("hands")) {
-        handsLabel_->setText(QString("Hands: %1").arg(state.value("hands").toString("n/a")));
-    }
-
     playersList_->clear();
+    playerNamesById_.clear();
     const QJsonArray players = state.value("players").toArray();
     for (const QJsonValue &value : players) {
         const QJsonObject p = value.toObject();
         const quint64 playerId = static_cast<quint64>(p.value("playerId").toInteger(0));
+        const QString nickname = p.value("nickname").toString("player");
+        playerNamesById_.insert(playerId, nickname);
         const QString stateText = p.value("stateText").toString(QString::number(p.value("state").toInt()));
         const QString dealerMark = p.value("isDealer").toBool() ? " [D]" : "";
         const QString botMark = p.value("isBot").toBool() ? " [BOT]" : "";
         const QString turnMark = playerId == currentTurnPlayerId_ ? " <- turn" : "";
         playersList_->addItem(QString("%1 (#%2)%3 | chips=%4 | %5%6%7")
-                                  .arg(p.value("nickname").toString("player"))
+                                  .arg(nickname)
                                   .arg(playerId)
                                   .arg(botMark)
                                   .arg(p.value("chips").toInt())
@@ -135,14 +170,41 @@ void TableWindow::applyState(const QJsonObject &state) {
     }
 }
 
+void TableWindow::updateActionControls() {
+    const bool isMyTurn = controller_ && controller_->playerId() != 0 &&
+                          controller_->playerId() == currentTurnPlayerId_;
+    const bool isBlindPostingTurn = currentGameState_ == 1 &&
+                                    (currentTurnPlayerId_ == smallBlindPlayerId_ || currentTurnPlayerId_ == bigBlindPlayerId_);
+    const int blindAmount = currentTurnPlayerId_ == smallBlindPlayerId_ ? smallBlindAmount_ : bigBlindAmount_;
+    const bool facingRaise = callAmount_ > 0;
+
+    checkBtn_->setEnabled(isMyTurn && !isBlindPostingTurn && !facingRaise);
+    callBtn_->setEnabled(isMyTurn && !isBlindPostingTurn && facingRaise);
+    foldBtn_->setEnabled(isMyTurn && !isBlindPostingTurn);
+    raiseBtn_->setEnabled(isMyTurn);
+    raiseBtn_->setText(isBlindPostingTurn ? "Bet" : "Raise");
+    if (isBlindPostingTurn) {
+        raiseSpin_->setValue(blindAmount);
+        raiseSpin_->setEnabled(false);
+    } else {
+        const int minRaiseAmount = facingRaise ? (callAmount_ + 1) : 20;
+        raiseSpin_->setMinimum(minRaiseAmount);
+        if (raiseSpin_->value() < minRaiseAmount) {
+            raiseSpin_->setValue(minRaiseAmount);
+        }
+        raiseSpin_->setEnabled(isMyTurn);
+    }
+}
+
 void TableWindow::appendAction(const QJsonObject &action) {
     const QString event = action.value("event").toString("action");
     const quint64 playerId = static_cast<quint64>(action.value("playerId").toInteger(0));
+    const QString nickname = playerNamesById_.value(playerId, QString("unknown (#%1)").arg(playerId));
     const int amount = action.value("amount").toInt(0);
     if (amount > 0) {
-        actionLog_->append(QString("[%1] player #%2 amount %3").arg(event).arg(playerId).arg(amount));
+        actionLog_->append(QString("[%1] %2 amount %3").arg(event).arg(nickname).arg(amount));
     } else {
-        actionLog_->append(QString("[%1] player #%2").arg(event).arg(playerId));
+        actionLog_->append(QString("[%1] %2").arg(event).arg(nickname));
     }
 }
 
