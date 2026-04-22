@@ -1,3 +1,0 @@
-D:\ITMO\Cmake\bin\cmake.exe -E rm -f CMakeFiles\poker_client.dir/objects.a
-D:\ITMO\gcc\bin\ar.exe qc CMakeFiles\poker_client.dir/objects.a @CMakeFiles\poker_client.dir\objects1.rsp
-D:\ITMO\gcc\bin\c++.exe -Wl,--whole-archive CMakeFiles\poker_client.dir/objects.a -Wl,--no-whole-archive -o poker_client.exe -Wl,--out-implib,libpoker_client.dll.a -Wl,--major-image-version,0,--minor-image-version,0 @CMakeFiles\poker_client.dir\linkLibs.rsp
