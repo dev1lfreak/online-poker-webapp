@@ -3,6 +3,7 @@
 #include "../../include/players/PlayerManager.hpp"
 #include "../../include/lobby/TableManager.hpp"
 #include "../../include/chat/ChatManager.hpp"
+#include <iostream>
 
 namespace poker {
     MessageRouter::MessageRouter(PokerServer &s)
@@ -17,6 +18,7 @@ namespace poker {
             case MessageType::JoinTable: {
                 auto &pm = server.getPlayerManager();
                 auto &tm = server.getTableManager();
+                auto &cm = server.getConnectionManager();
                 auto player = pm.getPlayer(msg.playerId);
                 if (!player) break;
 
@@ -25,6 +27,54 @@ namespace poker {
 
                 player->setTableId(table->getId());
                 table->addPlayer(player);
+
+                Message response;
+                response.type = MessageType::JoinTable;
+                response.playerId = player->getId();
+                response.tableId = table->getId();
+                response.payload = "joined";
+                cm.sendTo(player->getId(), response);
+                table->publishState();
+                break;
+            }
+            case MessageType::PlayWithBots: {
+                auto &pm = server.getPlayerManager();
+                auto &tm = server.getTableManager();
+                auto &cm = server.getConnectionManager();
+                auto player = pm.getPlayer(msg.playerId);
+                if (!player) break;
+
+                auto table = tm.createTable();
+
+                player->setTableId(table->getId());
+                table->addPlayer(player);
+
+                for (size_t i = 0; i < 5; ++i) {
+                    const auto botName = "BOT_" + std::to_string(i + 1);
+                    auto bot = pm.createPlayer(botName);
+                    bot->setTableId(table->getId());
+                    table->addPlayer(bot);
+                }
+
+                Message response;
+                response.type = MessageType::PlayWithBots;
+                response.playerId = player->getId();
+                response.tableId = table->getId();
+                response.payload = "joined_with_bots";
+                cm.sendTo(player->getId(), response);
+                table->publishState();
+                break;
+            }
+            case MessageType::StartGame: {
+                auto &pm = server.getPlayerManager();
+                auto &tm = server.getTableManager();
+                auto player = pm.getPlayer(msg.playerId);
+                if (!player) break;
+                int tableId = player->getTableId();
+                if (tableId < 0) break;
+                auto table = tm.getTable(tableId);
+                if (!table) break;
+                table->requestStartGame();
                 break;
             }
             case MessageType::Bet:
@@ -55,6 +105,11 @@ namespace poker {
                 auto table = tm.getTable(tableId);
                 if (!table) break;
                 table->disconnectPlayer(player->getId());
+                break;
+            }
+            case MessageType::Disconnect: {
+                std::cout << "Disconnect requested by player " << msg.playerId << std::endl;
+                server.handleDisconnect(msg.playerId);
                 break;
             }
             case MessageType::Chat: {

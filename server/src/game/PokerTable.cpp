@@ -4,6 +4,41 @@
 #include <boost/json.hpp>
 
 namespace poker {
+    namespace {
+        bool startsWith(const std::string &value, const std::string &prefix) {
+            return value.rfind(prefix, 0) == 0;
+        }
+
+        std::string suitToString(const poker::Suit suit) {
+            switch (suit) {
+                case poker::Suit::Hearts: return "H";
+                case poker::Suit::Diamonds: return "D";
+                case poker::Suit::Clubs: return "C";
+                case poker::Suit::Spades: return "S";
+            }
+            return "?";
+        }
+
+        std::string rankToString(const poker::Rank rank) {
+            switch (rank) {
+                case poker::Rank::Two: return "2";
+                case poker::Rank::Three: return "3";
+                case poker::Rank::Four: return "4";
+                case poker::Rank::Five: return "5";
+                case poker::Rank::Six: return "6";
+                case poker::Rank::Seven: return "7";
+                case poker::Rank::Eight: return "8";
+                case poker::Rank::Nine: return "9";
+                case poker::Rank::Ten: return "T";
+                case poker::Rank::Jack: return "J";
+                case poker::Rank::Queen: return "Q";
+                case poker::Rank::King: return "K";
+                case poker::Rank::Ace: return "A";
+            }
+            return "?";
+        }
+    }
+
     PokerTable::PokerTable(int id, boost::asio::io_context &io, ConnectionManager &connectionManager)
         : id(id),
           engine(),
@@ -41,21 +76,49 @@ namespace poker {
         obj["currentBet"] = rm.getCurrentBet();
         obj["currentTurnPlayerId"] = static_cast<std::int64_t>(currentTurnPlayerId);
         obj["gameState"] = static_cast<int>(engine.getState());
+        obj["gameInProgress"] = gameInProgress;
+        obj["canStartGame"] = players.size() > 1 && !gameInProgress;
 
         boost::json::array playersArr;
         for (const auto &p: players) {
             boost::json::object po;
             po["playerId"] = static_cast<std::int64_t>(p->getId());
+            po["nickname"] = p->getNickname();
             po["chips"] = p->getChips();
             po["state"] = static_cast<int>(p->getState());
+            po["stateText"] = playerStateText(p);
+            po["isDealer"] = players.size() > 1 && players[dealerIndex % players.size()]->getId() == p->getId();
+            po["isBot"] = isBotPlayer(p);
             playersArr.push_back(po);
         }
         obj["players"] = playersArr;
+
+        boost::json::array boardArr;
+        for (const auto &card : engine.getBoard()) {
+            boardArr.push_back(boost::json::value(serializeCard(card)));
+        }
+        obj["board"] = boardArr;
         Message stateMessage;
         stateMessage.type = MessageType::State;
         stateMessage.tableId = id;
         stateMessage.payload = boost::json::serialize(obj);
-        broadcast(stateMessage);
+        for (const auto &player : players) {
+            if (!player) continue;
+            if (player->getState() == PlayerState::Disconnected) continue;
+            auto personalized = obj;
+            boost::json::array myCardsArr;
+            for (const auto &card : player->getHand()) {
+                myCardsArr.push_back(boost::json::value(serializeCard(card)));
+            }
+            personalized["myCards"] = myCardsArr;
+
+            Message personalizedState;
+            personalizedState.type = MessageType::State;
+            personalizedState.tableId = id;
+            personalizedState.playerId = player->getId();
+            personalizedState.payload = boost::json::serialize(personalized);
+            connectionManager.sendTo(player->getId(), personalizedState);
+        }
     }
 
     // void PokerTable::broadcast(const Message& msg) {
@@ -83,6 +146,19 @@ namespace poker {
     // }
 
     void PokerTable::startTurnTimerFor(const std::shared_ptr<Player> &player) {
+        if (isBotPlayer(player)) {
+            currentTurnPlayerId = player->getId();
+            broadcastState();
+            turnTimer.start(5, [this, player]() {
+                boost::asio::post(strand, [this, player]() {
+                    if (currentTurnPlayerId == player->getId()) {
+                        processBotTurn(player);
+                    }
+                });
+            });
+            return;
+        }
+
         currentTurnPlayerId = player->getId();
 
         turnTimer.start(30, [this, player]() {
@@ -170,6 +246,7 @@ namespace poker {
     }
 
     void PokerTable::startHand() {
+        gameInProgress = true;
         rotateDealer();
         engine.startHand();
 
@@ -261,13 +338,14 @@ namespace poker {
             }
         }
 
+        gameInProgress = false;
+        currentTurnPlayerId = 0;
         broadcastState();
-        startGame();
     }
 
     void PokerTable::startGame() {
         boost::asio::post(strand, [this] {
-            if (players.size() > 1) {
+            if (players.size() > 1 && !gameInProgress) {
                 engine.setPlayers(players);
                 startHand();
             }
@@ -303,6 +381,16 @@ namespace poker {
         });
     }
 
+    void PokerTable::requestStartGame() {
+        startGame();
+    }
+
+    void PokerTable::publishState() {
+        boost::asio::post(strand, [this]() {
+            broadcastState();
+        });
+    }
+
     void PokerTable::broadcastAction(const std::string &action, PlayerId playerId, int amount, const std::string &payload) {
         boost::json::object obj;
         obj["event"] = action;
@@ -330,5 +418,62 @@ namespace poker {
             if (player->getState() == PlayerState::Disconnected) continue;
             connectionManager.sendTo(player->getId(), msg);
         }
+    }
+
+    bool PokerTable::isBotPlayer(const std::shared_ptr<Player> &player) const {
+        return player && startsWith(player->getNickname(), "BOT_");
+    }
+
+    void PokerTable::processBotTurn(const std::shared_ptr<Player> &player) {
+        boost::asio::post(strand, [this, player]() {
+            if (!player) return;
+
+            auto &rm = engine.getRoundManager();
+            bool actionDone = false;
+            if (rm.getCurrentBet() > 0) {
+                actionDone = rm.call(player->getId());
+                if (actionDone) {
+                    broadcastAction("call", player->getId(), rm.getCurrentBet());
+                }
+            } else {
+                actionDone = rm.check(player->getId());
+                if (actionDone) {
+                    broadcastAction("check", player->getId());
+                }
+            }
+
+            if (!actionDone) {
+                rm.fold(player->getId());
+                broadcastAction("fold", player->getId());
+            }
+
+            if (rm.isBettingComplete()) {
+                advanceGameFlow();
+            } else {
+                auto next = rm.nextActiveAfter(player->getId());
+                if (next) {
+                    startTurnTimerFor(next);
+                } else {
+                    advanceGameFlow();
+                }
+            }
+            broadcastState();
+        });
+    }
+
+    std::string PokerTable::serializeCard(const Card &card) const {
+        return rankToString(card.rank) + suitToString(card.suit);
+    }
+
+    std::string PokerTable::playerStateText(const std::shared_ptr<Player> &player) const {
+        switch (player->getState()) {
+            case PlayerState::Active: return "Active";
+            case PlayerState::Folded: return "Folded";
+            case PlayerState::AllIn: return "AllIn";
+            case PlayerState::Check: return "Check";
+            case PlayerState::Bet: return "Bet";
+            case PlayerState::Disconnected: return "Disconnected";
+        }
+        return "Unknown";
     }
 }

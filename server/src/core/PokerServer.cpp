@@ -103,6 +103,8 @@ namespace poker {
         if (!player) return;
 
         const int tableId = player->getTableId();
+        std::cout << "Handling disconnect for player " << playerId
+                  << " (table " << tableId << ")" << std::endl;
         if (tableId < 0) return;
 
         auto table = tableManager_.getTable(tableId);

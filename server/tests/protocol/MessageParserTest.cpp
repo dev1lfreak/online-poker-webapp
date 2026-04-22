@@ -31,3 +31,12 @@ TEST(MessageParserTest, SerializesMessageToJson) {
     EXPECT_NE(jsonStr.find("\"tableId\":5"), std::string::npos);
     EXPECT_NE(jsonStr.find("\"payload\":\"Joining\""), std::string::npos);
 }
+
+TEST(MessageParserTest, ParsesStartGameMessage) {
+    std::string jsonStr = R"({"type":"start_game","playerId":7,"payload":""})";
+
+    Message msg = MessageParser::parse(jsonStr);
+
+    EXPECT_EQ(msg.type, MessageType::StartGame);
+    EXPECT_EQ(msg.playerId, 7);
+}

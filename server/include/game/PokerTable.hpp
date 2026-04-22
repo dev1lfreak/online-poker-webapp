@@ -42,6 +42,8 @@ namespace poker {
         void startTurnTimerFor(const std::shared_ptr<Player> &player);
 
         void disconnectPlayer(PlayerId playerId);
+        void requestStartGame();
+        void publishState();
 
     private:
         int id;
@@ -57,6 +59,7 @@ namespace poker {
 
         int smallBlind{10};
         int bigBlind{20};
+        bool gameInProgress{false};
 
         PlayerId currentTurnPlayerId{0};
         ConnectionManager &connectionManager;
@@ -64,5 +67,9 @@ namespace poker {
         void broadcastState() ;
         void broadcastAction(const std::string &action, PlayerId playerId, int amount = 0, const std::string &payload = "");
         void broadcast(const Message &msg);
+        bool isBotPlayer(const std::shared_ptr<Player> &player) const;
+        void processBotTurn(const std::shared_ptr<Player> &player);
+        std::string serializeCard(const Card &card) const;
+        std::string playerStateText(const std::shared_ptr<Player> &player) const;
     };
 }

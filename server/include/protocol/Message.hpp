@@ -9,7 +9,10 @@ namespace poker {
     enum class MessageType {
         Login,
         JoinTable,
+        PlayWithBots,
+        StartGame,
         LeaveTable,
+        Disconnect,
         Bet,
         Call,
         Check,

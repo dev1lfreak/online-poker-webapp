@@ -16,8 +16,14 @@ namespace poker {
             msg.type = MessageType::Login;
         else if (type == "join")
             msg.type = MessageType::JoinTable;
+        else if (type == "play_with_bots")
+            msg.type = MessageType::PlayWithBots;
+        else if (type == "start_game")
+            msg.type = MessageType::StartGame;
         else if (type == "leave")
             msg.type = MessageType::LeaveTable;
+        else if (type == "disconnect")
+            msg.type = MessageType::Disconnect;
         else if (type == "bet")
             msg.type = MessageType::Bet;
         else if (type == "call")
@@ -57,7 +63,13 @@ namespace poker {
                 break;
             case MessageType::JoinTable: obj["type"] = "join";
                 break;
+            case MessageType::PlayWithBots: obj["type"] = "play_with_bots";
+                break;
+            case MessageType::StartGame: obj["type"] = "start_game";
+                break;
             case MessageType::LeaveTable: obj["type"] = "leave";
+                break;
+            case MessageType::Disconnect: obj["type"] = "disconnect";
                 break;
             case MessageType::Bet: obj["type"] = "bet";
                 break;
