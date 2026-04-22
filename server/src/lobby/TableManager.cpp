@@ -2,13 +2,13 @@
 #include <mutex>
 
 namespace poker {
-    TableManager::TableManager(boost::asio::io_context &ioContext)
-        : io(ioContext) {
+    TableManager::TableManager(boost::asio::io_context &ioContext, ConnectionManager &connManager)
+        : io(ioContext), connectionManager(connManager) {
     }
 
     std::shared_ptr<PokerTable> TableManager::createTable() {
         std::lock_guard lock(mutex);
-        auto table = std::make_shared<PokerTable>(nextId++, io);
+        auto table = std::make_shared<PokerTable>(nextId++, io, connectionManager);
         tables.push_back(table);
         return table;
     }

@@ -8,7 +8,7 @@ namespace poker {
         : io_(),
           signals_(io_),
           acceptor_(io_, boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), port)),
-          tableManager_(io_),
+          tableManager_(io_, connectionManager_),
           router_(*this)
     {
         setupSignalHandling();
@@ -94,5 +94,20 @@ namespace poker {
                     doAccept();
                 }
             });
+    }
+
+    void PokerServer::handleDisconnect(PlayerId playerId) {
+        if (playerId == 0) return;
+
+        auto player = playerManager_.getPlayer(playerId);
+        if (!player) return;
+
+        const int tableId = player->getTableId();
+        if (tableId < 0) return;
+
+        auto table = tableManager_.getTable(tableId);
+        if (!table) return;
+
+        table->disconnectPlayer(playerId);
     }
 }

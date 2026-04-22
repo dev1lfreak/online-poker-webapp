@@ -50,3 +50,37 @@ TEST_F(RoundManagerTest, ExactBalanceBetTriggersAllIn) {
     EXPECT_EQ(p3->getChips(), 0);
     EXPECT_EQ(p3->getState(), PlayerState::AllIn);
 }
+
+TEST_F(RoundManagerTest, BettingNotCompleteUntilAllActivePlayersMatchBet) {
+    EXPECT_FALSE(roundManager->isBettingComplete());
+
+    EXPECT_TRUE(roundManager->bet(p1->getId(), 100));
+    EXPECT_FALSE(roundManager->isBettingComplete());
+
+    EXPECT_TRUE(roundManager->call(p2->getId()));
+    EXPECT_FALSE(roundManager->isBettingComplete());
+
+    EXPECT_TRUE(roundManager->call(p3->getId()));
+    EXPECT_TRUE(roundManager->isBettingComplete());
+}
+
+TEST_F(RoundManagerTest, RaiseReopensActionForPlayersWhoAlreadyActed) {
+    EXPECT_TRUE(roundManager->bet(p1->getId(), 100));
+    EXPECT_TRUE(roundManager->call(p2->getId()));
+    EXPECT_FALSE(roundManager->isBettingComplete());
+
+    EXPECT_TRUE(roundManager->bet(p3->getId(), 200));
+    EXPECT_FALSE(roundManager->isBettingComplete());
+
+    EXPECT_TRUE(roundManager->call(p1->getId())); // +100 to match raise
+    EXPECT_TRUE(roundManager->call(p2->getId())); // +100 to match raise
+    EXPECT_TRUE(roundManager->isBettingComplete());
+}
+
+TEST_F(RoundManagerTest, CheckCompletesRoundWhenNoOutstandingBet) {
+    EXPECT_TRUE(roundManager->check(p1->getId()));
+    EXPECT_TRUE(roundManager->check(p2->getId()));
+    EXPECT_FALSE(roundManager->isBettingComplete());
+    EXPECT_TRUE(roundManager->check(p3->getId()));
+    EXPECT_TRUE(roundManager->isBettingComplete());
+}

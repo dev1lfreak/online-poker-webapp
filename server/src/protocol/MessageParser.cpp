@@ -16,12 +16,20 @@ namespace poker {
             msg.type = MessageType::Login;
         else if (type == "join")
             msg.type = MessageType::JoinTable;
+        else if (type == "leave")
+            msg.type = MessageType::LeaveTable;
         else if (type == "bet")
             msg.type = MessageType::Bet;
         else if (type == "call")
             msg.type = MessageType::Call;
+        else if (type == "check")
+            msg.type = MessageType::Check;
         else if (type == "fold")
             msg.type = MessageType::Fold;
+        else if (type == "action")
+            msg.type = MessageType::Action;
+        else if (type == "state")
+            msg.type = MessageType::State;
         else
             msg.type = MessageType::Chat;
 
@@ -49,13 +57,21 @@ namespace poker {
                 break;
             case MessageType::JoinTable: obj["type"] = "join";
                 break;
+            case MessageType::LeaveTable: obj["type"] = "leave";
+                break;
             case MessageType::Bet: obj["type"] = "bet";
                 break;
             case MessageType::Call: obj["type"] = "call";
                 break;
+            case MessageType::Check: obj["type"] = "check";
+                break;
             case MessageType::Fold: obj["type"] = "fold";
                 break;
             case MessageType::Chat: obj["type"] = "chat";
+                break;
+            case MessageType::Action: obj["type"] = "action";
+                break;
+            case MessageType::State: obj["type"] = "state";
                 break;
         }
 

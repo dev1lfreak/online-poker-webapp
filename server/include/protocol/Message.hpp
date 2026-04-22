@@ -9,10 +9,14 @@ namespace poker {
     enum class MessageType {
         Login,
         JoinTable,
+        LeaveTable,
         Bet,
         Call,
+        Check,
         Fold,
-        Chat
+        Chat,
+        Action,
+        State
     };
 
     struct Message {

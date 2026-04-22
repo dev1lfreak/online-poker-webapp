@@ -4,11 +4,12 @@
 #include <boost/json.hpp>
 
 namespace poker {
-    PokerTable::PokerTable(int id, boost::asio::io_context &io)
+    PokerTable::PokerTable(int id, boost::asio::io_context &io, ConnectionManager &connectionManager)
         : id(id),
           engine(),
           strand(io.get_executor()),
-          turnTimer(io) {
+          turnTimer(io),
+          connectionManager(connectionManager) {
     }
 
     void PokerTable::addPlayer(std::shared_ptr<Player> player) {
@@ -33,11 +34,13 @@ namespace poker {
 
     void PokerTable::broadcastState() {
         boost::json::object obj;
-        obj["type"] = "state";
+        obj["event"] = "state_snapshot";
         obj["tableId"] = id;
         auto &rm = engine.getRoundManager();
         obj["pot"] = rm.getPot();
         obj["currentBet"] = rm.getCurrentBet();
+        obj["currentTurnPlayerId"] = static_cast<std::int64_t>(currentTurnPlayerId);
+        obj["gameState"] = static_cast<int>(engine.getState());
 
         boost::json::array playersArr;
         for (const auto &p: players) {
@@ -48,10 +51,11 @@ namespace poker {
             playersArr.push_back(po);
         }
         obj["players"] = playersArr;
-
-        std::cout << "Broadcast table state: "
-                << boost::json::serialize(obj)
-                << std::endl;
+        Message stateMessage;
+        stateMessage.type = MessageType::State;
+        stateMessage.tableId = id;
+        stateMessage.payload = boost::json::serialize(obj);
+        broadcast(stateMessage);
     }
 
     // void PokerTable::broadcast(const Message& msg) {
@@ -92,10 +96,9 @@ namespace poker {
 
     void PokerTable::handleTimeout(const std::shared_ptr<Player> &player) {
         std::cout << "Player " << player->getId() << " timed out." << std::endl;
-
         auto &rm = engine.getRoundManager();
-
-        player->setState(PlayerState::Folded);
+        rm.fold(player->getId());
+        broadcastAction("timeout_fold", player->getId());
         std::cout << "Auto-folded player " << player->getId() << std::endl;
 
         advanceGameFlow();
@@ -117,6 +120,7 @@ namespace poker {
                     std::cout << "Player " << player->getId()
                             << " bets " << amount
                             << " at table " << id << std::endl;
+                    broadcastAction("bet", player->getId(), amount);
                     break;
                 }
                 case MessageType::Call: {
@@ -125,12 +129,25 @@ namespace poker {
                     std::cout << "Player " << player->getId()
                             << " calls " << amount
                             << " at table " << id << std::endl;
+                    broadcastAction("call", player->getId(), amount);
+                    break;
+                }
+                case MessageType::Check: {
+                    if (!rm.check(player->getId())) return;
+                    std::cout << "Player " << player->getId()
+                            << " checks at table " << id << std::endl;
+                    broadcastAction("check", player->getId());
                     break;
                 }
                 case MessageType::Fold: {
                     rm.fold(player->getId());
                     std::cout << "Player " << player->getId()
                             << " folds at table " << id << std::endl;
+                    broadcastAction("fold", player->getId());
+                    break;
+                }
+                case MessageType::LeaveTable: {
+                    disconnectPlayer(player->getId());
                     break;
                 }
                 default:
@@ -259,5 +276,59 @@ namespace poker {
 
     bool PokerTable::getFull() const {
         return isFull;
+    }
+
+    void PokerTable::disconnectPlayer(PlayerId playerId) {
+        boost::asio::post(strand, [this, playerId]() {
+            auto &rm = engine.getRoundManager();
+
+            auto it = std::find_if(players.begin(), players.end(),
+                                   [playerId](const std::shared_ptr<Player> &p) {
+                                       return p && p->getId() == playerId;
+                                   });
+            if (it == players.end()) return;
+
+            (*it)->setState(PlayerState::Disconnected);
+            (*it)->setTableId(-1);
+            rm.disconnect(playerId);
+            players.erase(it);
+            isFull = players.size() >= 6;
+
+            broadcastAction("disconnect", playerId);
+            broadcastState();
+
+            if (currentTurnPlayerId == playerId) {
+                advanceGameFlow();
+            }
+        });
+    }
+
+    void PokerTable::broadcastAction(const std::string &action, PlayerId playerId, int amount, const std::string &payload) {
+        boost::json::object obj;
+        obj["event"] = action;
+        obj["tableId"] = id;
+        obj["playerId"] = static_cast<std::int64_t>(playerId);
+        if (amount > 0) {
+            obj["amount"] = amount;
+        }
+        if (!payload.empty()) {
+            obj["payload"] = payload;
+        }
+
+        Message actionMessage;
+        actionMessage.type = MessageType::Action;
+        actionMessage.playerId = playerId;
+        actionMessage.tableId = id;
+        actionMessage.amount = amount;
+        actionMessage.payload = boost::json::serialize(obj);
+        broadcast(actionMessage);
+    }
+
+    void PokerTable::broadcast(const Message &msg) {
+        for (const auto &player : players) {
+            if (!player) continue;
+            if (player->getState() == PlayerState::Disconnected) continue;
+            connectionManager.sendTo(player->getId(), msg);
+        }
     }
 }

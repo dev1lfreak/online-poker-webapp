@@ -2,12 +2,14 @@
 #include <boost/asio.hpp>
 #include "../../include/game/PokerTable.hpp"
 #include "../../include/players/Player.hpp"
+#include "../../include/network/ConnectionManager.hpp"
 
 using namespace poker;
 
 TEST(PokerTableTest, TableSetsIsFullFlagAfter6Players) {
     boost::asio::io_context io;
-    PokerTable table(1, io);
+    ConnectionManager connectionManager;
+    PokerTable table(1, io, connectionManager);
 
     EXPECT_FALSE(table.getFull());
 

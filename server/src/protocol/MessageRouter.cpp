@@ -29,6 +29,7 @@ namespace poker {
             }
             case MessageType::Bet:
             case MessageType::Call:
+            case MessageType::Check:
             case MessageType::Fold: {
                 auto &pm = server.getPlayerManager();
                 auto &tm = server.getTableManager();
@@ -44,11 +45,26 @@ namespace poker {
                 table->handleMessage(msg, player);
                 break;
             }
+            case MessageType::LeaveTable: {
+                auto &pm = server.getPlayerManager();
+                auto &tm = server.getTableManager();
+                auto player = pm.getPlayer(msg.playerId);
+                if (!player) break;
+                int tableId = player->getTableId();
+                if (tableId < 0) break;
+                auto table = tm.getTable(tableId);
+                if (!table) break;
+                table->disconnectPlayer(player->getId());
+                break;
+            }
             case MessageType::Chat: {
                 auto &chat = server.getChatManager();
                 chat.addMessage(msg.payload);
                 break;
             }
+            case MessageType::Action:
+            case MessageType::State:
+                break;
         }
     }
 }

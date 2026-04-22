@@ -3,6 +3,7 @@
 #include "GameEngine.hpp"
 #include "../protocol/Message.hpp"
 #include "../util/TurnTimer.hpp"
+#include "../network/ConnectionManager.hpp"
 #include <boost/asio.hpp>
 #include <vector>
 #include <memory>
@@ -10,7 +11,7 @@
 namespace poker {
     class PokerTable {
     public:
-        PokerTable(int id, boost::asio::io_context &io);
+        PokerTable(int id, boost::asio::io_context &io, ConnectionManager &connectionManager);
 
         void addPlayer(std::shared_ptr<Player> player);
 
@@ -40,6 +41,8 @@ namespace poker {
 
         void startTurnTimerFor(const std::shared_ptr<Player> &player);
 
+        void disconnectPlayer(PlayerId playerId);
+
     private:
         int id;
         std::vector<std::shared_ptr<Player> > players;
@@ -56,7 +59,10 @@ namespace poker {
         int bigBlind{20};
 
         PlayerId currentTurnPlayerId{0};
+        ConnectionManager &connectionManager;
 
         void broadcastState() ;
+        void broadcastAction(const std::string &action, PlayerId playerId, int amount = 0, const std::string &payload = "");
+        void broadcast(const Message &msg);
     };
 }

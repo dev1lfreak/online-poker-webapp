@@ -56,6 +56,9 @@ namespace poker {
 
                     doRead();
                 } else {
+                    if (playerId_ != 0) {
+                        server_.handleDisconnect(playerId_);
+                    }
                     manager_.remove(self);
                 }
             });
@@ -75,6 +78,9 @@ namespace poker {
                         doWrite();
                     }
                 } else {
+                    if (playerId_ != 0) {
+                        server_.handleDisconnect(playerId_);
+                    }
                     manager_.remove(self);
                 }
             });

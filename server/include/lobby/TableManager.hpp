@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../game/PokerTable.hpp"
+#include "../network/ConnectionManager.hpp"
 #include <vector>
 #include <memory>
 #include <mutex>
@@ -9,7 +10,7 @@
 namespace poker {
     class TableManager {
     public:
-        explicit TableManager(boost::asio::io_context &io);
+        TableManager(boost::asio::io_context &io, ConnectionManager &connectionManager);
 
         std::shared_ptr<PokerTable> createTable();
 
@@ -22,5 +23,6 @@ namespace poker {
         std::mutex mutex;
         int nextId{1};
         boost::asio::io_context &io;
+        ConnectionManager &connectionManager;
     };
 }

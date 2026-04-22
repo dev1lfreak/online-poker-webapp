@@ -2,6 +2,8 @@
 
 #include <vector>
 #include <memory>
+#include <unordered_map>
+#include <unordered_set>
 #include "../players/Player.hpp"
 
 namespace poker {
@@ -19,7 +21,11 @@ namespace poker {
 
         bool call(PlayerId id);
 
+        bool check(PlayerId id);
+
         void fold(PlayerId id);
+
+        void disconnect(PlayerId id);
 
         int getPot() const;
 
@@ -42,6 +48,8 @@ namespace poker {
         size_t index{0};
         int pot{0};
         int currentBet{0};
+        std::unordered_map<PlayerId, int> roundBets;
+        std::unordered_set<PlayerId> actedPlayers;
 
         PlayerId findPlayerIndex(PlayerId id) const;
 

@@ -1,11 +1,23 @@
 #include "../../include/game/RoundManager.hpp"
+#include <algorithm>
 
 namespace poker {
+    namespace {
+        bool canTakeBetAction(const std::shared_ptr<Player>& p) {
+            return p && p->getState() == PlayerState::Active && p->getChips() > 0;
+        }
+    }
+
     void RoundManager::setPlayers(const std::vector<std::shared_ptr<Player> > &p) {
         players = p;
         index = 0;
         pot = 0;
         currentBet = 0;
+        roundBets.clear();
+        actedPlayers.clear();
+        for (const auto& player : players) {
+            roundBets[player->getId()] = 0;
+        }
     }
 
     std::shared_ptr<Player> RoundManager::currentPlayer() {
@@ -34,6 +46,10 @@ namespace poker {
 
     std::shared_ptr<Player> RoundManager::startBettingRound(size_t dealerIndex) {
         currentBet = 0;
+        actedPlayers.clear();
+        for (const auto& player : players) {
+            roundBets[player->getId()] = 0;
+        }
         if (players.empty()) return nullptr;
 
         index = dealerIndex % players.size();
@@ -54,12 +70,22 @@ namespace poker {
         if (amount <= 0) return false;
         for (auto &p: players) {
             if (p->getId() == id) {
+                if (!canTakeBetAction(p)) return false;
                 int chips = p->getChips();
                 if (amount > chips) return false;
 
+                const int previousContribution = roundBets[id];
+                const int newContribution = previousContribution + amount;
+                if (currentBet > 0 && newContribution <= currentBet) return false;
+
                 p->setChips(chips - amount);
                 pot += amount;
-                currentBet = amount;
+                currentBet = std::max(currentBet, newContribution);
+                roundBets[id] = newContribution;
+
+                // Raise/bet reopens the action for everyone else.
+                actedPlayers.clear();
+                actedPlayers.insert(id);
 
                 if (chips <= amount)
                     p->setState(PlayerState::AllIn);
@@ -70,15 +96,20 @@ namespace poker {
     }
 
     bool RoundManager::call(PlayerId id) {
-        if (currentBet <= 0) return false;
         for (auto &p: players) {
             if (p->getId() == id) {
+                if (!canTakeBetAction(p)) return false;
                 int chips = p->getChips();
                 if (chips <= 0) return false;
 
-                int amount = std::min(currentBet, chips);
+                const int toCall = currentBet - roundBets[id];
+                if (toCall <= 0) return false;
+
+                int amount = std::min(toCall, chips);
                 p->setChips(chips - amount);
                 pot += amount;
+                roundBets[id] += amount;
+                actedPlayers.insert(id);
 
                 if (chips <= amount)
                     p->setState(PlayerState::AllIn);
@@ -90,8 +121,30 @@ namespace poker {
 
     void RoundManager::fold(PlayerId id) {
         for (auto &p: players)
-            if (p->getId() == id)
+            if (p->getId() == id) {
                 p->setState(PlayerState::Folded);
+                actedPlayers.insert(id);
+            }
+    }
+
+    bool RoundManager::check(PlayerId id) {
+        for (auto &p: players) {
+            if (p->getId() != id) continue;
+            if (!canTakeBetAction(p)) return false;
+            if (roundBets[id] != currentBet) return false;
+            actedPlayers.insert(id);
+            return true;
+        }
+        return false;
+    }
+
+    void RoundManager::disconnect(PlayerId id) {
+        for (auto &p: players) {
+            if (p->getId() != id) continue;
+            p->setState(PlayerState::Disconnected);
+            actedPlayers.insert(id);
+            break;
+        }
     }
 
     int RoundManager::getPot() const {
@@ -108,6 +161,10 @@ namespace poker {
 
     void RoundManager::clearCurrentBet() {
         currentBet = 0;
+        actedPlayers.clear();
+        for (const auto& player : players) {
+            roundBets[player->getId()] = 0;
+        }
     }
 
     bool RoundManager::isBettingComplete() const {
@@ -116,7 +173,12 @@ namespace poker {
 
         for (const auto& p : players) {
             if (p->getState() == PlayerState::Active) {
-                if (p->getChips() > 0)
+                if (p->getChips() <= 0) continue;
+                if (!actedPlayers.count(p->getId()))
+                    return false;
+                auto it = roundBets.find(p->getId());
+                const int playerContribution = (it == roundBets.end()) ? 0 : it->second;
+                if (playerContribution != currentBet)
                     return false;
             }
         }

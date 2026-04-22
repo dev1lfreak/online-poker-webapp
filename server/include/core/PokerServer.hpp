@@ -28,6 +28,7 @@ namespace poker {
         ConnectionManager& getConnectionManager() { return connectionManager_; }
         MessageRouter& getRouter() { return router_; }
         boost::asio::io_context& getIoContext() { return io_; }
+        void handleDisconnect(PlayerId playerId);
 
     private:
         void doAccept();
