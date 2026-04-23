@@ -5,9 +5,12 @@
 #include <QJsonObject>
 #include <QHash>
 
+#include <array>
+
 class QLabel;
 class QListWidget;
 class QPushButton;
+class QProgressBar;
 class QSpinBox;
 class QTextEdit;
 class QTimer;
@@ -30,16 +33,17 @@ private slots:
 
 private:
     void setupUi();
-    void setCardLabels(const QJsonArray &board, const QJsonArray &holeCards);
+    void setCardImages(const QJsonArray &board, const QJsonArray &holeCards);
+    void setCardPixmap(QLabel *label, const QString &cardCode, bool hideUnknown);
     void updateActionControls();
 
     ClientController *controller_;
 
     QLabel *potLabel_{nullptr};
     QLabel *gameStatusLabel_{nullptr};
-    QLabel *timerLabel_{nullptr};
-    QLabel *myCardsLabel_{nullptr};
-    QLabel *boardCardsLabel_{nullptr};
+    QProgressBar *timerBar_{nullptr};
+    std::array<QLabel*, 2> myCardLabels_{{nullptr, nullptr}};
+    std::array<QLabel*, 5> boardCardLabels_{{nullptr, nullptr, nullptr, nullptr, nullptr}};
     QListWidget *playersList_{nullptr};
     QTextEdit *actionLog_{nullptr};
 

@@ -7,6 +7,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QMessageBox>
+#include <QPixmap>
 #include <QPushButton>
 #include <QVBoxLayout>
 #include <QWidget>
@@ -25,6 +26,13 @@ void ConnectionWindow::setupUi() {
     auto *central = new QWidget(this);
     auto *layout = new QVBoxLayout(central);
 
+    auto *logoLabel = new QLabel();
+    QPixmap logoPixmap("./imgs/logo_1.png");
+    if (logoPixmap.isNull()) logoPixmap.load("imgs/logo_1.png");
+    if (logoPixmap.isNull()) logoPixmap.load("src/imgs/logo_1.png");
+    if (logoPixmap.isNull()) logoPixmap.load("../src/imgs/logo_1.png");
+    logoLabel->setPixmap(logoPixmap.scaledToWidth(180, Qt::SmoothTransformation));
+
     hostEdit_ = new QLineEdit("127.0.0.1");
     portEdit_ = new QLineEdit("8080");
     nicknameEdit_ = new QLineEdit();
@@ -35,6 +43,7 @@ void ConnectionWindow::setupUi() {
     exitButton_ = new QPushButton("Exit");
     exitButton_->setProperty("role", "danger");
 
+    layout->addWidget(logoLabel, 0, Qt::AlignHCenter);
     layout->addWidget(new QLabel("IP:"));
     layout->addWidget(hostEdit_);
     layout->addWidget(new QLabel("Port:"));

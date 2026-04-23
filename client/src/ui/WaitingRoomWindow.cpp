@@ -5,6 +5,7 @@
 #include <QJsonArray>
 #include <QLabel>
 #include <QListWidget>
+#include <QPixmap>
 #include <QPushButton>
 #include <QVBoxLayout>
 #include <QWidget>
@@ -25,6 +26,13 @@ void WaitingRoomWindow::setupUi() {
     auto *central = new QWidget(this);
     auto *layout = new QVBoxLayout(central);
 
+    auto *logoLabel = new QLabel();
+    QPixmap logoPixmap("./imgs/logo_1.png");
+    if (logoPixmap.isNull()) logoPixmap.load("imgs/logo_1.png");
+    if (logoPixmap.isNull()) logoPixmap.load("src/imgs/logo_1.png");
+    if (logoPixmap.isNull()) logoPixmap.load("../src/imgs/logo_1.png");
+    logoLabel->setPixmap(logoPixmap.scaledToWidth(180, Qt::SmoothTransformation));
+
     playersList_ = new QListWidget();
     lastResultTitleLabel_ = new QLabel("Last Hand Result:");
     lastResultLabel_ = new QLabel("No games played at this table yet");
@@ -33,6 +41,7 @@ void WaitingRoomWindow::setupUi() {
     leaveButton_ = new QPushButton("Leave Table");
     leaveButton_->setProperty("role", "danger");
 
+    layout->addWidget(logoLabel, 0, Qt::AlignHCenter);
     layout->addWidget(playersList_);
     layout->addWidget(lastResultTitleLabel_);
     layout->addWidget(lastResultLabel_);
@@ -41,7 +50,7 @@ void WaitingRoomWindow::setupUi() {
 
     setCentralWidget(central);
     setWindowTitle("Online Poker - Waiting Room");
-    resize(420, 360);
+    resize(420, 400);
 }
 
 void WaitingRoomWindow::applyState(const QJsonObject &state) {

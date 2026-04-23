@@ -18,9 +18,9 @@ int main(int argc, char *argv[]) {
         "  font-size: 14px;"
         "}"
         "QLineEdit, QTextEdit, QListWidget, QSpinBox {"
-        "  background-color: #1d1333;"
+        "  background-color: #282828;"
         "  color: #f7f1ff;"
-        "  border: 1px solid #323132;"
+        "  border: 1px solid #363636;"
         "  border-radius: 8px;"
         "  padding: 6px 8px;"
         "  font-size: 14px;"
@@ -51,7 +51,7 @@ int main(int argc, char *argv[]) {
         "  background-color: #781927;"
         "}"
         "QPushButton[role=\"danger\"]:pressed {"
-        "  background-color: #551821cf;"
+        "  background-color: #2f0d12;"
         "}"
     );
 
